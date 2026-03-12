@@ -249,12 +249,15 @@ export class CSharpRenderer extends ConvenienceRenderer {
         if (this._csOptions.virtual) propertyArray.push("virtual ");
 
         // add usage of `required` props on non-optional
-        propertyArray.push("required "); //TODO gate behind cli flag
+        
         let typeArray = [csType,]
         let defaultValue: Sourcelike[] = []
         if (property.isOptional) {//TODO gate behind cli flag
-            typeArray = ["Optional<", ...typeArray, ">"]
-            defaultValue = [" = Optional.None;"]
+            // defaultValue = [" = Optional<", ...typeArray, ">.None;"]
+            // typeArray = ["Optional<", ...typeArray, ">"]
+            
+        } else {
+            propertyArray.push("required "); //TODO gate behind cli flag
         }
         return [...propertyArray, ...typeArray, " ", name, " { get; set; }", ...defaultValue];
     }
