@@ -34,7 +34,6 @@ import type { cSharpOptions } from "./language";
 import {
     AccessModifier,
     csTypeForTransformedStringType,
-    isValueType,
     namingFunction,
     namingFunctionKeep,
     noFollow,
@@ -188,11 +187,7 @@ export class CSharpRenderer extends ConvenienceRenderer {
     ): Sourcelike {
         t = followTargetType(t);
         const csType = this.csType(t, follow, withIssues);
-        if (isValueType(t)) {
-            return [csType, "?"];
-        } else {
-            return csType;
-        }
+        return [csType, "?"];
     }
 
     protected baseclassForType(_t: Type): Sourcelike | undefined {
@@ -244,15 +239,24 @@ export class CSharpRenderer extends ConvenienceRenderer {
         _jsonName: string,
     ): Sourcelike {
         const t = property.type;
-        const csType = property.isOptional
+        const isNullable = followTargetType(property.type).isNullable;
+        const csType = property.isOptional && !isNullable// check nullability to avoid adding two "?"
             ? this.nullableCSType(t, followTargetType, true)
-            : this.csType(t, followTargetType, true);
+            : this.csType(t, followTargetType, true); //if nullable, a "?" will already be added
 
         const propertyArray = ["public "];
 
         if (this._csOptions.virtual) propertyArray.push("virtual ");
 
-        return [...propertyArray, csType, " ", name, " { get; set; }"];
+        // add usage of `required` props on non-optional
+        propertyArray.push("required "); //TODO gate behind cli flag
+        let typeArray = [csType,]
+        let defaultValue: Sourcelike[] = []
+        if (property.isOptional) {//TODO gate behind cli flag
+            typeArray = ["Optional<", ...typeArray, ">"]
+            defaultValue = [" = Optional.None;"]
+        }
+        return [...propertyArray, ...typeArray, " ", name, " { get; set; }", ...defaultValue];
     }
 
     protected emitDescriptionBlock(lines: Sourcelike[]): void {
@@ -536,14 +540,22 @@ export class CSharpRenderer extends ConvenienceRenderer {
                 genericEmited = true;
             }
         }
+        let dotnextEmitted: boolean = false;
+        //todo: gate behind flag
+        let ensureDotNextOnce = () => {
+            if (!dotnextEmitted) {
+                this.emitUsing("DotNext");
+                dotnextEmitted = true;
+            }
+        }
         this.typeGraph.allTypesUnordered().forEach(_ => {
             matchCompoundType(
                 _,
                 _arrayType => this._csOptions.useList ? ensureGenericOnce() : undefined,
-                _classType => { },
+                _classType => ensureDotNextOnce(),
                 _mapType => ensureGenericOnce(),
-                _objectType => { },
-                _unionType => { }
+                _objectType => {},
+                _unionType => ensureDotNextOnce()
             )
         });
     }
