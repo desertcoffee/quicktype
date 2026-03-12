@@ -36,6 +36,8 @@ export class TypeScriptZodTargetLanguage extends TargetLanguage<
             new Map();
         const dateTimeType = "date-time";
         mapping.set("date-time", dateTimeType);
+        const uuidType = "uuid";
+        mapping.set("uuid", uuidType);
         return mapping;
     }
 
